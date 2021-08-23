@@ -12,7 +12,7 @@ builds:
     goos:
       - linux
     id: client
-    main: ./client/main.go
+    dir: client
     binary: higgs-monitor-client
     ldflags:
      - -s -w -X main.Version={{.Tag}}
