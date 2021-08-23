@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 var babelID string
 var _db influxdb2.Client
 var _api api.WriteAPI
+var _xroute []string
 
 func getClient(c *config) influxdb2.Client {
 	_db = influxdb2.NewClient(c.InfluxDBAddr, c.InfluxDBToken)
@@ -31,6 +33,7 @@ func getClient(c *config) influxdb2.Client {
 type handler func(string)
 
 func loopOnce(c *config, h handler) error {
+	_xroute = make([]string, 0)
 	conn, err := net.Dial("unix", c.BabelCtl)
 	if err != nil {
 		return err
@@ -61,6 +64,11 @@ func loopOnce(c *config, h handler) error {
 		}
 		h(msg)
 	}
+	p := influxdb2.NewPointWithMeasurement("xroute").
+		AddTag("id", babelID).
+		AddField("routes", strings.Join(_xroute, ",")).
+		SetTime(time.Now())
+	_api.WritePoint(p)
 	_api.Flush()
 	return nil
 }
@@ -130,6 +138,11 @@ func neighbourHandler(m map[string]string) {
 	if err != nil {
 		return
 	}
+	reachCount := 0
+	for reach > 0 {
+		reach = reach & (reach - 1)
+		reachCount++
+	}
 	rtt, _ := strconv.ParseFloat(m["rtt"], 64)
 	if rtt > 5000 {
 		return
@@ -137,7 +150,7 @@ func neighbourHandler(m map[string]string) {
 	cost, _ := strconv.ParseUint(m["cost"], 10, 64)
 	p := influxdb2.NewPointWithMeasurement("neighbour").
 		AddTag("id", babelID).AddTag("to", m["address"]).AddTag("if", m["if"]).
-		AddField("reach", reach).AddField("rtt", rtt).AddField("cost", cost).
+		AddField("reach", reachCount).AddField("rtt", rtt).AddField("cost", cost).
 		SetTime(time.Now())
 	_api.WritePoint(p)
 }
@@ -161,5 +174,5 @@ func routeHandler(m map[string]string) {
 }
 
 func xrouteHandler(m map[string]string) {
-	return
+	_xroute = append(_xroute, fmt.Sprintf("%s@%s", m["prefix"], m["from"]))
 }
