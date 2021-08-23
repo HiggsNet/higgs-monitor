@@ -36,5 +36,5 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.CR_PAT }}
           registry: ghcr.io
-          repository: higgsnet/smartdns/smartdns
+          repository: higgsnet/higgs-monitor/monitor
           tag_with_ref: true
